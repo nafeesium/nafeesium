@@ -3,7 +3,7 @@
 <!-- header banner, might redo the colors eventually -->
 <img src="https://capsule-render.vercel.app/api?type=waving&height=180&color=161821&section=header&text=NAFEESIUM&fontColor=E0A458&fontSize=60&fontAlignY=40&desc=indie%20dev%20%E2%80%94%20games%2C%20tools%2C%20small%20obsessions&descAlignY=62&descColor=7EC8E3&descSize=16&animation=fadeIn" width="100%" alt="header">
 
-<img src='https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=500&size=20&pause=1200&duration=3000&center=true&vCenter=true&width=650&height=45&color=E0A458&background=00000000&lines=*+it%27s+dangerous+to+code+alone.;*+currently+building+games+in+GodotScroll+for+more' alt="typing" />
+<img src='https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=500&size=20&pause=1200&duration=3000&center=true&vCenter=true&width=650&height=45&color=E0A458&background=00000000&lines=*+it%27s+dangerous+to+code+alone.+*;*+currently+building+games+in+GodotScroll+for+more' alt="typing" />
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 </div>
