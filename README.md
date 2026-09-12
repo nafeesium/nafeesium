@@ -58,7 +58,7 @@ No studio, no roadmap review, just me and a folder structure that made sense at 
 
 |  |  |
 |---|---|
-| Email | `your@email.here` |
+| Email | `nafeesium@gmail.com` |
 | GitHub | `github.com/Nafeesium` |
 | Instagram | `instagram.com/nafeesium` |
 
