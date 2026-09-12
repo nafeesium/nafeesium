@@ -54,7 +54,7 @@ No studio, no roadmap review, just me and a folder structure that made sense at 
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=161821&height=100&section=footer&animation=fadeIn" width="100%" alt="footer">
+
 
 ```
 TO BE CONTINUED...
