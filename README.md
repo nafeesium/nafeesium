@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://nafeesium.github.io/Nafeesium/">
-  <img src="assets/banner.svg" width="100%" alt="NAFEESIUM: animated ASCII halftone banner. Click to open the interactive version.">
+  <img src="assets/banner.svg" width="100%" alt="NAFEESIUM: animated ASCII halftone banner with a ghost cursor. Click to open the live, cursor-reactive version.">
 </a>
 
 </div>
@@ -19,7 +19,7 @@ No studio, no roadmap review, just me and a folder structure that made sense at 
 
 | Status | Project | Details |
 |:---:|---|-----------|
-| `PROTOTYPING`|  **BLIGHT** | An FPS survival shooter taking place in liminal place. |
+| `UNDER CONSTRUCTION`|  **PARANOIC LOOP** | An FPS survival shooter taking place in liminal place. |
 
 <!-- ordering above is roughly by how much time each one has eaten -->
 
