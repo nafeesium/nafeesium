@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nafeesium</title>
+<meta name="description" content="Nafeesium. Indie dev: games, tools, small obsessions.">
+<meta name="theme-color" content="#161821">
+<style>
+  :root { --bg: #161821; --amber: #E0A458; --blue: #7EC8E3; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    font: 12px/1.4 "Fira Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--blue);
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  /* soft vignette so the corners stay quiet and the HUD stays readable */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(22, 24, 33, .82) 100%);
+  }
+  .hud {
+    position: fixed; left: 0; right: 0; z-index: 2; padding: 18px 22px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+    pointer-events: none; letter-spacing: .04em;
+  }
+  .top { top: 0; } .bot { bottom: 0; }
+  .dim { opacity: .55; }
+  .hud a { pointer-events: auto; color: var(--blue); text-decoration: none; opacity: .75; transition: color .15s, opacity .15s; }
+  .hud a:hover, .hud a:focus-visible { color: var(--amber); opacity: 1; outline: none; }
+  .links { display: flex; gap: 1.6em; }
+  .dot { display: inline-block; width: .6em; height: .6em; margin-right: .7em; background: var(--amber); animation: blink 1.4s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: .15; } }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .hud span { white-space: nowrap; }
+  @media (max-width: 560px) {
+    .hud { padding: 14px; font-size: 11px; }
+    .top { justify-content: flex-end; } .top .dim { display: none; }
+    .bot { flex-direction: column; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+</head>
+<body>
+<h1 class="sr">Nafeesium</h1>
+<canvas id="c" role="img" aria-label="Interactive ASCII halftone field spelling NAFEESIUM. Move the pointer to disturb it, click for a ripple."></canvas>
+
+<div class="hud top">
+  <span class="dim">* it's dangerous to code alone. *</span>
+  <span><i class="dot"></i>BLIGHT &mdash; prototyping</span>
+</div>
+<div class="hud bot">
+  <span class="dim">indie dev &mdash; games, tools, small obsessions</span>
+  <nav class="links">
+    <a href="https://github.com/Nafeesium">github</a>
+    <a href="https://instagram.com/nafeesium">instagram</a>
+    <a href="mailto:nafeesium@gmail.com">email</a>
+  </nav>
+</div>
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center;color:#E0A458">NAFEESIUM &mdash; indie dev. (needs JavaScript for the pretty part)</p></noscript>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const NAME = 'NAFEESIUM';
+  const RAMP = ' .:-=+*#%@';                                   // halftone ramp, light -> dense
+  const GLITCH = '01<>/\\|[]{}#$%&*+=~^'.split('');
+  // 0-3 cool blues (the field), 4-7 amber to cream (letters, heat, ripples)
+  const PAL = ['#2a3646', '#3d6073', '#5a9fb7', '#7EC8E3', '#a9793a', '#E0A458', '#f2c98a', '#fff3da'];
+  const BG = '#161821';
+  const FONT = '"Fira Code","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+
+  let W, H, dpr, cw, ch, cols, rows, fs;
+  let atlas, sw, sh, glyphRow;
+  let heat, heat2, mask;
+  let bias = 0;                                    // grows if the device struggles
+  const ripples = [];
+  const ptr = { x: 0, y: 0, px: 0, py: 0, speed: 0, inside: false };
+  let lastInput = -1e9;
+  let t = 0;
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const hash = (x, y) => {
+    let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+
+  // ---- sprites: every (glyph, colour) pair is drawn once, then blitted ----------------
+  function buildAtlas() {
+    const glyphs = RAMP.slice(1).split('').concat(GLITCH);
+    glyphRow = new Map(glyphs.map((g, i) => [g, i]));
+    sw = Math.ceil(cw * dpr);
+    sh = Math.ceil(ch * dpr);
+    atlas = document.createElement('canvas');
+    atlas.width = sw * PAL.length;
+    atlas.height = sh * glyphs.length;
+    const a = atlas.getContext('2d');
+    a.setTransform(sw / cw, 0, 0, sh / ch, 0, 0);
+    a.font = `${fs}px ${FONT}`;
+    a.textAlign = 'center';
+    a.textBaseline = 'alphabetic';
+    glyphs.forEach((g, j) => PAL.forEach((col, k) => {
+      a.fillStyle = col;
+      a.fillText(g, k * cw + cw / 2, j * ch + ch / 2 + fs * 0.34);
+    }));
+  }
+
+  // ---- the name: rendered big in a hidden canvas, sampled into per-cell coverage ----------
+  function buildMask() {
+    const mw = cols * cw, mh = rows * ch;
+    const mc = document.createElement('canvas');
+    mc.width = mw; mc.height = mh;
+    const m = mc.getContext('2d', { willReadFrequently: true });
+    const family = '"Arial Black","Helvetica Neue",Impact,Arial,sans-serif';
+    const portrait = W < 600 && H > W * 1.1;
+    const lines = portrait ? [NAME.slice(0, 5), NAME.slice(5)] : [NAME];
+
+    m.font = `900 100px ${family}`;
+    if ('letterSpacing' in m) m.letterSpacing = '5px';
+    const widest = Math.max(...lines.map(l => m.measureText(l).width));
+    let size = 100 * (mw * (portrait ? 0.78 : 0.82)) / widest;
+    size = Math.min(size, mh * (portrait ? 0.2 : 0.3));
+
+    m.font = `900 ${size}px ${family}`;
+    if ('letterSpacing' in m) m.letterSpacing = `${size * 0.05}px`;
+    m.fillStyle = m.strokeStyle = '#fff';
+    m.lineWidth = size * 0.045;                 // thickens thin fallback fonts so the name stays solid everywhere
+    m.lineJoin = 'round';
+    m.textAlign = 'center';
+    m.textBaseline = 'middle';
+    const cy = mh * 0.47;
+    lines.forEach((l, i) => {
+      const ly = cy + (i - (lines.length - 1) / 2) * size * 0.98;
+      m.fillText(l, mw / 2, ly);
+      m.strokeText(l, mw / 2, ly);
+    });
+
+    const px = m.getImageData(0, 0, mw, mh).data;
+    mask = new Float32Array(cols * rows);
+    const nx = 3, ny = 4;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let s = 0;
+        for (let j = 0; j < ny; j++) {
+          const yy = Math.min(mh - 1, (y * ch + (j + 0.5) * ch / ny) | 0);
+          for (let i = 0; i < nx; i++) {
+            const xx = Math.min(mw - 1, (x * cw + (i + 0.5) * cw / nx) | 0);
+            s += px[(yy * mw + xx) * 4 + 3];
+          }
+        }
+        mask[y * cols + x] = s / (255 * nx * ny);
+      }
+    }
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    cw = clamp(Math.round(W / 150) + bias, 7, 14);
+    ch = Math.round(cw * 1.9);
+    fs = Math.round(cw / 0.6);
+    cols = Math.ceil(W / cw);
+    rows = Math.ceil(H / ch);
+    heat = new Float32Array(cols * rows);
+    heat2 = new Float32Array(cols * rows);
+    buildAtlas();
+    buildMask();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ---- background field: a few slow sine waves, quantised to the ramp -----------------
+  function baseField(X, Y) {
+    let v = Math.sin(X * 0.006 + t * 0.55);
+    v += Math.sin(Y * 0.009 - t * 0.42);
+    v += Math.sin((X * 0.5 + Y) * 0.0045 + t * 0.3);
+    const dx = X - W * 0.5, dy = Y - H * 0.5;
+    v += Math.sin(Math.sqrt(dx * dx + dy * dy) * 0.011 - t * 0.8);
+    v = (v + 4) * 0.125;
+    return Math.pow(Math.min(1, Math.max(0, (v - 0.46) * 2.1)), 1.3) * 0.42;
+  }
+
+  // ---- input -------------------------------------------------------------------
+  function onMove(e) {
+    ptr.x = e.clientX; ptr.y = e.clientY;
+    ptr.inside = true;
+    lastInput = performance.now();
+  }
+  addEventListener('pointermove', onMove, { passive: true });
+  addEventListener('pointerdown', e => {
+    onMove(e);
+    ripples.push({ x: e.clientX, y: e.clientY, t0: t });
+    if (ripples.length > 5) ripples.shift();
+  }, { passive: true });
+  addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') ptr.inside = false; }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', () => { ptr.inside = false; });
+
+  let rz;
+  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(resize, 120); });
+
+  // ---- main loop ------------------------------------------------------------------
+  let last = performance.now(), slow = 0;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+    last = now;
+    t += dt * (reduce ? 0.25 : 1);
+
+    // if the device can't keep up, coarsen the grid once in a while
+    slow = dt > 0.03 ? slow + 1 : Math.max(0, slow - 1);
+    if (slow > 90 && bias < 5) { bias++; slow = 0; resize(); return; }
+
+    // autopilot: when nobody is poking it, a ghost cursor wanders around
+    const idle = now - lastInput > 3500;
+    if (idle && !reduce) {
+      const a = t * 0.45;
+      ptr.x = W * (0.5 + 0.36 * Math.sin(a + 0.6));
+      ptr.y = H * (0.5 + 0.28 * Math.sin(a * 1.37));
+      ptr.inside = true;
+    }
+    const mv = Math.hypot(ptr.x - ptr.px, ptr.y - ptr.py) / Math.max(dt, 0.001);
+    ptr.speed += (Math.min(mv, 4000) - ptr.speed) * 0.25;
+    ptr.px = ptr.x; ptr.py = ptr.y;
+
+    // heat: stamp a soft blob under the pointer (more when moving fast), then diffuse + fade
+    const R = Math.max(90, Math.min(W, H) * 0.14);
+    if (ptr.inside) {
+      const strength = Math.min(1, 0.38 + ptr.speed / 1400);
+      const gx = ptr.x / cw, gy = ptr.y / ch;
+      const x0 = Math.max(0, Math.floor(gx - R * 1.7 / cw)), x1 = Math.min(cols - 1, Math.ceil(gx + R * 1.7 / cw));
+      const y0 = Math.max(0, Math.floor(gy - R * 1.7 / ch)), y1 = Math.min(rows - 1, Math.ceil(gy + R * 1.7 / ch));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const dx = (x + 0.5) * cw - ptr.x, dy = (y + 0.5) * ch - ptr.y;
+          const v = Math.exp(-(dx * dx + dy * dy) / (R * R) * 2.2) * strength;
+          const i = y * cols + x;
+          if (v > heat[i]) heat[i] = v;
+        }
+      }
+    }
+    const fade = Math.pow(0.93, dt * 60);
+    for (let y = 1; y < rows - 1; y++) {
+      for (let x = 1; x < cols - 1; x++) {
+        const i = y * cols + x;
+        const avg = (heat[i - 1] + heat[i + 1] + heat[i - cols] + heat[i + cols]) * 0.25;
+        heat2[i] = (heat[i] * 0.78 + avg * 0.22) * fade;
+      }
+    }
+    [heat, heat2] = [heat2, heat];
+
+    for (let k = ripples.length - 1; k >= 0; k--) if (t - ripples[k].t0 > 3.2) ripples.splice(k, 1);
+
+    // ---- draw ----
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+    const reveal = reduce ? 1 : clamp((t - 0.25) / 1.8, 0, 1);
+
+    for (let y = 0; y < rows; y++) {
+      const Y = (y + 0.5) * ch;
+      for (let x = 0; x < cols; x++) {
+        const X = (x + 0.5) * cw;
+        const i = y * cols + x;
+        const h = heat[i];
+        const m = mask[i];
+
+        let ring = 0;
+        for (let k = 0; k < ripples.length; k++) {
+          const r = ripples[k], age = t - r.t0;
+          const d = Math.hypot(X - r.x, Y - r.y);
+          const off = (d - age * 520) / 38;
+          ring += Math.exp(-off * off) * Math.exp(-age * 1.3) * 0.9;
+        }
+        ring = Math.min(1, ring);
+
+        let d, col, g = null;
+        if (m > 0.03) {
+          // letters: dense, amber, brighten under the cursor, scramble while hot
+          const shimmer = 0.5 + 0.5 * Math.sin(x * 0.6 + y * 1.1 + t * 2.2);
+          d = Math.min(1, m * (0.72 + 0.2 * shimmer) + h * 0.35 + ring * 0.4);
+          col = 4 + Math.min(3, Math.floor(h * 3.2 + ring * 3 + (d > 0.85 ? 1 : 0)));
+          const key = x / cols * 0.85 + hash(x, y) * 0.15;
+          if (key > reveal) {                                   // intro: not decoded yet
+            if (Math.random() < 0.5) { g = GLITCH[(Math.random() * GLITCH.length) | 0]; col = 2; } else continue;
+          } else if (key > reveal - 0.05 && Math.random() < 0.5) {
+            g = GLITCH[(Math.random() * GLITCH.length) | 0]; col = 6;
+          } else if (!reduce && h > 0.3 && Math.random() < (h - 0.25) * 0.9) {
+            g = GLITCH[(Math.random() * GLITCH.length) | 0]; col = 6 + (Math.random() < 0.4 ? 1 : 0);
+          }
+        } else {
+          d = baseField(X, Y) + h * 0.85 + ring * 0.9;
+          const warm = h + ring;
+          col = warm > 0.35 ? 4 + Math.min(3, Math.floor(warm * 3)) : Math.min(3, Math.floor(d * 5));
+          // faint registration lattice, like the dot grid of a halftone screen
+          if (d < 0.06 && (x & 3) === 0 && (y & 1) === 0) { d = 0.1; col = 0; }
+        }
+
+        const idx = Math.min(9, (d * 9 + 0.5) | 0);
+        let row;
+        if (g) row = glyphRow.get(g);
+        else if (idx > 0) row = idx - 1;
+        else continue;
+        ctx.drawImage(atlas, col * sw, row * sh, sw, sh, x * cw, y * ch, cw, ch);
+      }
+    }
+  }
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
