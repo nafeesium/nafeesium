@@ -8,13 +8,14 @@ Change the constants below (name, colours, frame count) and re-run.
 """
 import math
 import os
+import random
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "assets"))
 
 NAME = "NAFEESIUM"
 TAGLINE = "indie dev — games, tools, small obsessions"
-HINT = "[ click the banner to play ]"
+HINT = "[ click for the live version ]"
 BG, AMBER, BLUE = "#161821", "#E0A458", "#7EC8E3"
 
 RAMP = " .:-=+*#%@"      # halftone ramp, light to dense
@@ -27,6 +28,15 @@ LOOP = FRAMES * DT
 PAD_TOP = 14
 FS = 13.3
 STILL = FRAMES // 2      # frame shown when animation is off / unsupported
+
+# Banner: a recording of the interactive page. GitHub strips scripts and an <img> SVG gets no
+# pointer events, so instead of reacting to YOUR cursor, a ghost cursor runs the same heat /
+# glitch / ripple model from index.html and the result is baked into the frames.
+BF, BDT = 36, 0.1        # 36 frames x 0.1s = 3.6s loop
+BSTILL = 6
+GLITCH = "01<>/\\|[]{}#$%&*+=~^"
+CREAM, LIGHT_AMBER = "#fff3da", "#f2c98a"
+CLICKS = (0, BF // 2)    # frames where the ghost "clicks" and sends a ripple
 
 # 5x7 block font: only the letters the name needs.
 FONT = {
@@ -91,46 +101,127 @@ def row_y(r, pad=PAD_TOP):
 
 
 def text(cls, y, s):
+    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace(" ", NB)
     return (f'<text class="{cls}" x="0" y="{y}" textLength="{WIDTH}" '
             f'lengthAdjust="spacing">{s}</text>')
 
 
-def banner_frame(f):
-    p = 2 * math.pi * f / FRAMES
-    band_pos = f / FRAMES * (COLS + 80) - 40   # diagonal glint sweeping across
-    out = []
+def ghost(f):
+    """Ghost cursor in grid pixels. A closed figure-eight, so the loop is seamless."""
+    a = 2 * math.pi * f / BF
+    return (WIDTH * (0.5 + 0.38 * math.sin(a)),
+            ROWS * LH * (0.5 + 0.30 * math.sin(2 * a + 0.6)))
+
+
+def simulate_heat():
+    """Same model as index.html: stamp a soft blob under the cursor, diffuse, fade.
+    Runs two laps and keeps the second, so the heat trail wraps around cleanly."""
+    sub = 4                                      # sub-steps per frame, smooths the trail
+    fade = 0.93 ** (60 * BDT / sub)
+    R2 = 70.0 ** 2
+    heat = [[0.0] * COLS for _ in range(ROWS)]
+    kept = []
+    for step in range(BF * 2):
+        f = step % BF
+        x0, y0 = ghost(f - 1)
+        x1, y1 = ghost(f)
+        speed = math.hypot(x1 - x0, y1 - y0) / BDT
+        strength = min(1.0, 0.38 + speed / 1400)
+        for s in range(sub):
+            t = (s + 1) / sub
+            gx, gy = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+            for r in range(ROWS):
+                dy = (r + 0.5) * LH - gy
+                for c in range(COLS):
+                    dx = (c + 0.5) * CW - gx
+                    v = math.exp(-(dx * dx + dy * dy) / R2 * 2.2) * strength
+                    if v > heat[r][c]:
+                        heat[r][c] = v
+            new = [[0.0] * COLS for _ in range(ROWS)]
+            for r in range(ROWS):
+                for c in range(COLS):
+                    n = ((heat[r][c - 1] if c else 0.0) + (heat[r][c + 1] if c < COLS - 1 else 0.0) +
+                         (heat[r - 1][c] if r else 0.0) + (heat[r + 1][c] if r < ROWS - 1 else 0.0))
+                    new[r][c] = (heat[r][c] * 0.78 + n * 0.25 * 0.22) * fade
+            heat = new
+        if step >= BF:
+            kept.append([row[:] for row in heat])
+    return kept
+
+
+def ring_at(f, X, Y):
+    """Ripple strength at pixel (X, Y) in frame f, from every ghost click."""
+    total = 0.0
+    for e in CLICKS:
+        age = ((f - e) % BF) * BDT
+        cx, cy = ghost(e)
+        off = (math.hypot(X - cx, Y - cy) - age * 520) / 38
+        total += math.exp(-off * off) * math.exp(-age * 1.3) * 0.9
+    return min(1.0, total)
+
+
+LAYERS = ("b", "w", "c", "g", "n", "n2", "n3")
+
+
+def banner_frame(f, heat, rng):
+    p = 2 * math.pi * f / BF
+    grid = {k: [[NB] * COLS for _ in range(ROWS)] for k in LAYERS}
     for r in range(ROWS):
-        bg, gl, nm = [], [], []
+        Y = (r + 0.5) * LH
         for c in range(COLS):
-            band = math.exp(-(((c - band_pos) - r * 1.5) / 7.0) ** 2)
+            X = (c + 0.5) * CW
+            h = heat[r][c]
+            ring = ring_at(f, X, Y)
+            warm = h + ring
             if MASK[r][c]:
-                # letters stay dense so they read at a glance; shimmer only flips #/%/@
+                # letters: dense so they read at a glance, brighter and glitchy where it is hot
                 shimmer = 0.5 + 0.5 * math.sin(c * 0.7 + r * 1.3 + p * 3)
-                idx = 7 + (1 if shimmer > 0.45 else 0) + (1 if band > 0.35 else 0)
-                nm.append(RAMP[min(9, idx)]); bg.append(NB); gl.append(NB)
-            elif GLOW[r][c]:
-                # knockout halo: mostly blank, a few faint dots, so edges stay crisp
-                k = 0.5 + 0.5 * math.sin(c * 0.9 - r * 1.7 + p * 2)
-                gl.append("." if k > 0.7 else NB)
-                bg.append(NB); nm.append(NB)
+                d = min(1.0, 0.72 + 0.2 * shimmer + h * 0.35 + ring * 0.4)
+                ch = RAMP[min(9, max(7, int(d * 9 + 0.5)))]
+                layer = "n" if warm < 0.3 else ("n2" if warm < 0.6 else "n3")
+                if h > 0.3 and rng.random() < (h - 0.25) * 0.9:
+                    ch = rng.choice(GLITCH)
+                    layer = "n3" if rng.random() < 0.4 else "n2"
+                grid[layer][r][c] = ch
+                continue
+            if GLOW[r][c]:
+                d = h * 0.85 + ring * 0.9
+                if d < 0.1:                      # knockout halo: mostly blank so edges stay crisp
+                    if 0.5 + 0.5 * math.sin(c * 0.9 - r * 1.7 + p * 2) > 0.7:
+                        grid["g"][r][c] = "."
+                    continue
             else:
                 zone = 0.45 if TOP - 1 <= r <= TOP + 7 else 1.0   # calmer field behind the name
-                bg.append(ramp((dens(c, r, p) + band * 0.35) * zone))
-                gl.append(NB); nm.append(NB)
-        y = row_y(r)
-        out.append(text("b", y, "".join(bg)))
-        if any(ch != NB for ch in gl):
-            out.append(text("g", y, "".join(gl)))
-        if any(ch != NB for ch in nm):
-            out.append(text("n", y, "".join(nm)))
+                d = dens(c, r, p) * zone + h * 0.85 + ring * 0.9
+            ch = ramp(d)
+            if ch == " ":
+                continue
+            grid["c" if warm > 0.8 else "w" if warm > 0.35 else "b"][r][c] = ch
+
+    # the ghost cursor itself, a little [+] reticle
+    gx, gy = ghost(f)
+    cx, cy = int(gx / CW), int(gy / LH)
+    for dx, ch in ((-1, "["), (0, "+"), (1, "]")):
+        if 0 <= cx + dx < COLS:
+            for k in LAYERS:
+                grid[k][cy][cx + dx] = NB
+            grid["n3"][cy][cx + dx] = ch
+
+    out = []
+    for r in range(ROWS):
+        for k in LAYERS:
+            row = "".join(grid[k][r])
+            if row.strip(NB):
+                out.append(text(k, row_y(r), row))
     return out
 
 
-def anim_css(extra=""):
-    pct = 100 / FRAMES
+def anim_css(extra="", frames=FRAMES, dt=DT):
+    pct = 100 / frames
+    loop = frames * dt
     return f"""
 text{{font-family:'Fira Code','JetBrains Mono','SFMono-Regular',Menlo,Consolas,'Liberation Mono','Courier New',monospace;font-size:{FS}px;white-space:pre}}
-.f{{opacity:0;animation:s {LOOP:.2f}s step-end infinite}}
+.f{{opacity:0;animation:s {loop:.2f}s step-end infinite}}
 .k{{opacity:1}}
 @keyframes s{{0%{{opacity:1}}{pct - 0.05:.3f}%{{opacity:0}}100%{{opacity:0}}}}
 .b{{fill:{BLUE};fill-opacity:.5}}
@@ -142,9 +233,9 @@ text{{font-family:'Fira Code','JetBrains Mono','SFMono-Regular',Menlo,Consolas,'
 """
 
 
-def frame_group(f, rows):
-    delay = 0.0 if f == 0 else (FRAMES - f) * DT   # negative delay: no load-time overlap
-    cls = "f k" if f == STILL else "f"
+def frame_group(f, rows, frames=FRAMES, dt=DT, still=STILL):
+    delay = 0.0 if f == 0 else (frames - f) * dt   # negative delay: no load-time overlap
+    cls = "f k" if f == still else "f"
     return f'<g class="{cls}" style="animation-delay:-{delay:.3f}s">' + "".join(rows) + "</g>"
 
 
@@ -154,16 +245,18 @@ def write_banner():
     n = len("▸ " + TAGLINE)
     extra = (".sub{fill:" + BLUE + ";fill-opacity:.8}.hint{fill:" + AMBER +
              ";fill-opacity:.55}.cur{fill:" + AMBER + ";animation:blk 1s step-end infinite}"
-             "@keyframes blk{50%{opacity:0}}")
+             "@keyframes blk{50%{opacity:0}}"
+             ".w{fill:" + AMBER + ";fill-opacity:.8}.c,.n3{fill:" + CREAM + "}.n2{fill:" + LIGHT_AMBER + "}")
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {height}" '
         f'width="{WIDTH}" height="{height}" role="img" '
-        f'aria-label="{NAME} — animated ASCII halftone banner">',
-        f"<style>{anim_css(extra)}</style>",
+        f'aria-label="{NAME} — ASCII halftone banner with a ghost cursor">',
+        f"<style>{anim_css(extra, BF, BDT)}</style>",
         f'<rect width="100%" height="100%" fill="{BG}"/>',
     ]
-    for f in range(FRAMES):
-        parts.append(frame_group(f, banner_frame(f)))
+    rng = random.Random(7)
+    for f, heat in enumerate(simulate_heat()):
+        parts.append(frame_group(f, banner_frame(f, heat, rng), BF, BDT, BSTILL))
     parts.append(
         f'<text class="sub" x="16" y="{sub_y}" textLength="{n * CW}" lengthAdjust="spacing">'
         f"▸{NB}{TAGLINE.replace(' ', NB)}</text>"
