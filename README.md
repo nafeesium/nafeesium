@@ -1,84 +1,31 @@
-<div align="center">
+# hey, I'm Nafeesium
 
-```
- ███╗   ██╗ █████╗ ███████╗███████╗███████╗███████╗███████╗██╗██╗   ██╗███╗   ███╗
- ████╗  ██║██╔══██╗██╔════╝██╔════╝██╔════╝██╔════╝██╔════╝██║██║   ██║████╗ ████║
- ██╔██╗ ██║███████║█████╗  █████╗  █████╗  ███████╗█████╗  ██║██║   ██║██╔████╔██║
- ██║╚██╗██║██╔══██║██╔══╝  ██╔══╝  ██╔══╝  ╚════██║██╔══╝  ██║██║   ██║██║╚██╔╝██║
- ██║ ╚████║██║  ██║██║     ███████╗███████╗███████║███████╗██║╚██████╔╝██║ ╚═╝ ██║
- ╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝     ╚══════╝╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝
-```
+I take software that weighs too much and rebuild it so it weighs almost nothing.
 
-### less software. more computer.
+Most apps are an iceberg. The part you actually use is the tip.
 
-*I take apps that eat your CPU, RAM and disk for no reason,*
-*strip them to the bone, and rebuild them so they cost almost nothing.*
 
-</div>
+<img width="483" height="724" alt="Screenshot 2026-11-22 093406" src="https://github.com/user-attachments/assets/76175942-bd79-4400-af8d-bdee1a031b68" />
 
----
+Everything under the waterline eats your CPU, sits in your RAM and takes up
+your disk, even while the app is closed. Nobody asked for any of it.
 
-## `$ whoami`
+So I cut it away and rebuild what's left.
 
-```
-name      Nafeesium
-mission   debloat everything
-method    delete → measure → rebuild smaller
-enemy     software that idles at 400 MB
-status    still deleting
-```
+<img width="1017" height="1547" alt="13eb2226-4090-43a4-9d2e-cc26a7aa9207" src="https://github.com/user-attachments/assets/68782aed-781b-4be7-b810-08e39f2f3519" />
 
-## `$ top` — the problem
 
-Most apps do one small job and bring a whole runtime, a background updater,
-three helper processes and a telemetry client along to do it.
-Your machine pays for all of it, all day, whether you open the app or not.
+It opens fast, does its one job, and goes quiet. When it's closed it uses
+nothing, and when it's open it uses very little.
 
-## `$ diff before after`
+## Rebuilt so far
 
-```
- BEFORE  (the usual bloated app)
- CPU   ████████████████░░░░░░░░   idle spin, always awake
- RAM   ██████████████████████░░   hundreds of MB, doing nothing
- DISK  ████████████████████░░░░   hundreds of MB to ship a text box
-
- AFTER   (my rebuild)
- CPU   █░░░░░░░░░░░░░░░░░░░░░░░   sleeps until you need it
- RAM   ██░░░░░░░░░░░░░░░░░░░░░░   a few MB
- DISK  █░░░░░░░░░░░░░░░░░░░░░░░   a single small binary
-```
-<!-- bars are illustrative: swap in your real measured numbers -->
-
-## `$ cat rules.txt`
-
-```
-1. No background process unless the user asked for one.
-2. No framework to draw a button.
-3. If it idles, it should cost zero.
-4. One small binary beats an installer, a service and a launcher.
-5. Measure first. Delete second. Rebuild third.
-```
-
-## `$ ls rebuilt/`
-
-| Project | Replaces | Cost now |
+| Project | Replaces | Weight now |
 |---|---|---|
-| [`your-repo`](https://github.com/your-username/your-repo) | the heavy app it replaces | MB RAM · MB disk |
-| [`your-repo`](https://github.com/your-username/your-repo) | the heavy app it replaces | MB RAM · MB disk |
-| [`your-repo`](https://github.com/your-username/your-repo) | the heavy app it replaces | MB RAM · MB disk |
+| [TinyPad]([https://github.com/your-username/your-repo](https://github.com/nafeesium/TinyPad)) | NotePad replacement | <10MB RAM, 235kb size |
 
-## `$ contact`
 
-```
-github    @your-username
-site      https://your-site
-```
+## Find me
 
-<div align="center">
-
-```
-idle is the goal.
-$ _
-```
-
-</div>
+https://discord.gg/uPv7WUT9RF
+https://instagram.com/tiny.corp
