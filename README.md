@@ -12,7 +12,8 @@ your disk, even while the app is closed. Nobody asked for any of it.
 
 So I cut it away and rebuild what's left.
 
-<img width="1017" height="1547" alt="13eb2226-4090-43a4-9d2e-cc26a7aa9207" src="https://github.com/user-attachments/assets/68782aed-781b-4be7-b810-08e39f2f3519" />
+<img width="316" height="480" alt="Screenshot 2026-11-22 094532" src="https://github.com/user-attachments/assets/72d6c6ba-df7f-4535-b003-e1f93b9458cc" />
+
 
 
 It opens fast, does its one job, and goes quiet. When it's closed it uses
