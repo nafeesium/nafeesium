@@ -23,10 +23,10 @@ nothing, and when it's open it uses very little.
 
 | Project | Replaces | Weight now |
 |---|---|---|
-| [TinyPad]([https://github.com/your-username/your-repo](https://github.com/nafeesium/TinyPad)) | NotePad replacement | <10MB RAM, 235kb size |
+| [TinyPad](https://github.com/nafeesium/TinyPad) | NotePad replacement | <10MB RAM, 235kb size |
 
 
 ## Find me
 
-https://discord.gg/uPv7WUT9RF
+https://discord.gg/uPv7WUT9RF <br>
 https://instagram.com/tiny.corp
